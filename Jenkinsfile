@@ -1,66 +1,64 @@
 pipeline {
     agent any
+
     environment {
-        AWS_ACCOUNT_ID = "123456789012"
+        AWS_ACCOUNT_ID = "977098985978"
         AWS_REGION = "us-east-1"
-        ECR_REPO = "my-ecr-repo"
-        DOCKER_IMAGE = "my-app"
+        REPO_NAME = "Gambit-damiano"
+        IMAGE_TAG = "latest"
+        AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
     }
+
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: "${env.BRANCH_NAME}", url: 'https://github.com/your-repo.git'
-            }
-        }
-        
-        stage('Build & Test') {
-            steps {
-                script {
-                    if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'staging') {
-                        sh 'mvn clean package'
-                        sh 'mvn test'
-                    } else {
-                        echo "Skipping tests for ${env.BRANCH_NAME} branch"
-                    }
-                }
+                git branch: 'main', url: 'https://github.com/Gambitdevops/Gambit-damiano.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t $DOCKER_IMAGE:${env.BRANCH_NAME} ."
+                script {
+                    dockerImage = docker.build("${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}:${IMAGE_TAG}")
+                }
+            }
+        }
+
+        stage('Login to ECR') {
+            steps {
+                script {
+                    sh '''
+                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                    aws configure set default.region $AWS_REGION
+                    aws ecr get-login-password | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    '''
+                }
             }
         }
 
         stage('Push to ECR') {
-            when {
-                branch 'main'
-            }
             steps {
-                sh """
-                aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-                docker tag $DOCKER_IMAGE:${env.BRANCH_NAME} $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:${env.BRANCH_NAME}
-                docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:${env.BRANCH_NAME}
-                """
+                script {
+                    sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}:${IMAGE_TAG}"
+                }
             }
         }
 
-        stage('Deploy to Kubernetes') {
-            when {
-                branch 'main'
-            }
+        stage('Deploy to EC2') {
             steps {
-                sh 'kubectl apply -f k8s-deployment.yaml'
+                sshagent(['seetha-ec2-key']) {
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no ec2-user@34.229.148.16 << EOF
+                    docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}:${IMAGE_TAG}
+                    docker stop flask-container || true
+                    docker rm flask-container || true
+                    docker run -d --name flask-container -p 80:5000 ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}:${IMAGE_TAG}
+                    EOF
+                    '''
+                }
             }
-        }
-    }
-
-    post {
-        success {
-            echo 'Pipeline executed successfully!'
-        }
-        failure {
-            echo 'Pipeline execution failed!'
         }
     }
 }
