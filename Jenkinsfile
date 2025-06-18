@@ -11,7 +11,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'devops', url: 'https://github.com/gambitdevops/gambit-damiano.git'
+                git branch: 'devops', url: 'https://github.com/Gambitdevops/gambit-damiano.git'
             }
         }
 
