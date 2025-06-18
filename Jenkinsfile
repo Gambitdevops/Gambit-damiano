@@ -19,12 +19,13 @@ pipeline {
     stages {
 
         stage('Clone App Repo') {
-            steps {
-                sh 'rm -rf flask-aws-app'
-                sh 'git clone https://github.com/Gambitdevops/flask-aws-app.git'
-            }
-        }
-
+    steps {
+        sh '''
+        rm -rf flask-aws-app
+        git clone https://github.com/Gambitdevops/flask-aws-app.git
+        '''
+    }
+}
         stage('Build Docker Image') {
             steps {
                 dir('flask-aws-app') {
