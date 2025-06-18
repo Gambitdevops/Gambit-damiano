@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_ACCOUNT_ID = "977098985978"
         AWS_REGION = "us-east-1"
-        REPO_NAME = "Gambit-damiano"
+        REPO_NAME = "gambit-damiano"
         IMAGE_TAG = "latest"
     }
 
