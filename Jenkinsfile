@@ -2,21 +2,18 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCOUNT_ID = '977098985978'
-        AWS_REGION = 'us-east-1'
-        ECR_REPO_NAME = 'gambit-damiano'
-        IMAGE_TAG = 'latest'
+        AWS_REGION = "us-east-1"
+        ECR_REPO = "977098985978.dkr.ecr.us-east-1.amazonaws.com/gambit-damiano"
     }
 
     stages {
         stage('Checkout Jenkinsfile Repo') {
             steps {
-                echo "Jenkinsfile checked out from Gambit-damiano@devops"
-                // Already checked out automatically
+                git branch: 'devops', url: 'https://github.com/Gambitdevops/gambit-damiano.git'
             }
         }
 
-        stage('Clone Flask App Code') {
+        stage('Clone App Repo') {
             steps {
                 sh 'git clone https://github.com/Gambitdevops/flask-aws-app.git'
             }
@@ -24,38 +21,27 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh """
-                        docker build -t ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG} flask-aws-app
-                    """
+                dir('flask-aws-app') {
+                    sh 'docker build -t $ECR_REPO:latest .'
                 }
             }
         }
 
         stage('Login to ECR') {
             steps {
-                script {
-                    sh """
-                        aws ecr get-login-password --region ${AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-                    """
-                }
+                sh 'aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO'
             }
         }
 
         stage('Push to ECR') {
             steps {
-                script {
-                    sh """
-                        docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG}
-                    """
-                }
+                sh 'docker push $ECR_REPO:latest'
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                echo "You can add SSH deploy commands here"
+                echo 'Add your deployment script here'
             }
         }
     }
